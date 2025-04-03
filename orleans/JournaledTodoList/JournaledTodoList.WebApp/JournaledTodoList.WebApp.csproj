@@ -13,6 +13,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Server" Version="9.1.2" />
     <PackageReference Include="Microsoft.Orleans.EventSourcing" Version="9.1.2" />
+    <PackageReference Include="Orleans.EventSourcing.Snapshot" Version="8.0.0" />
     <PackageReference Include="Orleans.Providers.MongoDB" Version="9.1.0" />
   </ItemGroup>
 

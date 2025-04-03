@@ -1,6 +1,8 @@
 ﻿using JournaledTodoList.WebApp.Components;
 using JournaledTodoList.WebApp.Services;
 using Orleans.Providers;
+using Orleans.EventSourcing.Snapshot;
+using Orleans.EventSourcing.Snapshot.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +21,19 @@ builder.UseOrleans(siloBuilder =>
         options.DatabaseName = "OrleansTestAppPubSubStore";
         options.CreateShardKeyForCosmos = createShardKey;
     });
-    siloBuilder.AddLogStorageBasedLogConsistencyProviderAsDefault();
     siloBuilder.AddStateStorageBasedLogConsistencyProvider(name: Constants.StateStorageProviderName);
+    siloBuilder.AddSnapshotStorageBasedLogConsistencyProviderAsDefault((op, name) =>
+    {
+        // Take snapshot every five events
+        op.SnapshotStrategy = strategyInfo => strategyInfo.CurrentConfirmedVersion - strategyInfo.SnapshotVersion >= 5;
+        op.UseIndependentEventStorage = false;
+
+        // Should configure independent event storage when set UseIndependentEventStorage true
+        //op.ConfigureIndependentEventStorage = (services, name) =>
+        //{
+        //    services.AddSingleton<IGrainEventStorage, SampleIndependentEventStorage>();
+        //};
+    });
 });
 builder.Services.AddScoped<TodoListService>();
 
