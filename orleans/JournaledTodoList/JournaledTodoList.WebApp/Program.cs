@@ -3,6 +3,8 @@ using JournaledTodoList.WebApp.Services;
 using Orleans.Providers;
 using Orleans.EventSourcing.Snapshot;
 using Orleans.EventSourcing.Snapshot.Hosting;
+using JournaledTodoList.WebApp;
+using Orleans.Providers.MongoDB.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,13 +28,18 @@ builder.UseOrleans(siloBuilder =>
     {
         // Take snapshot every five events
         op.SnapshotStrategy = strategyInfo => strategyInfo.CurrentConfirmedVersion - strategyInfo.SnapshotVersion >= 5;
-        op.UseIndependentEventStorage = false;
+        op.UseIndependentEventStorage = true;
 
-        // Should configure independent event storage when set UseIndependentEventStorage true
-        //op.ConfigureIndependentEventStorage = (services, name) =>
-        //{
-        //    services.AddSingleton<IGrainEventStorage, SampleIndependentEventStorage>();
-        //};
+        op.ConfigureIndependentEventStorage = (services, name) =>
+        {
+            var options = new MongoDBGrainStorageOptions
+            {
+                DatabaseName = "OrleansTestAppPubSubStore",
+                CreateShardKeyForCosmos = createShardKey,
+            };
+            services.AddSingleton<MongoDBGrainStorageOptions>(options);
+            services.AddSingleton<IGrainEventStorage, MongoStorage>();
+        };
     });
 });
 builder.Services.AddScoped<TodoListService>();
