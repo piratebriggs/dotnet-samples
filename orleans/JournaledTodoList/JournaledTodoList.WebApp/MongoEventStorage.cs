@@ -7,18 +7,21 @@ using Orleans.Providers.MongoDB.Utils;
 
 namespace JournaledTodoList.WebApp;
 
-
+/// <summary>
+/// Based on Orleans.Providers.MongoDB.StorageProviders.MongoGrainStorage
+/// Uses existing IGrainStateSerializer to hydrate events back from storage.
+/// </summary>
 public class MongoStorage : IGrainEventStorage
 {
     private readonly string _collectionPrefix = "Events";
     private readonly ConcurrentDictionary<string, MongoEventStorageCollection> collections = new ConcurrentDictionary<string, MongoEventStorageCollection>();
-    private readonly MongoDBGrainStorageOptions options;
+    private readonly MongoDBOptions options;
     private readonly IMongoClient mongoClient;
     private readonly IGrainStateSerializer serializer;
 
     public MongoStorage(
         IMongoClientFactory mongoClientFactory,
-        MongoDBGrainStorageOptions options,
+        MongoDBOptions options,
         IGrainStateSerializer serializer)
     {
         this.mongoClient = mongoClientFactory.Create(options, "Storage");
@@ -33,7 +36,7 @@ public class MongoStorage : IGrainEventStorage
         var startNewEvent = await EventsCount(grainTypeName, grainReference);
 
         var tasks = events
-            .Select((e, i) => collection.WriteAsync(startNewEvent + i, e))
+            .Select((e, i) => collection.WriteAsync(grainReference,startNewEvent + i, e))
             .ToArray();
 
         await Task.WhenAll(tasks);
@@ -44,7 +47,7 @@ public class MongoStorage : IGrainEventStorage
         var collection = GetCollection(grainTypeName);
 
         var tasks = Enumerable.Range(start, count)
-            .Select(i => collection.ReadAsync<TEvent>(i))
+            .Select(i => collection.ReadAsync<TEvent>(grainReference, i))
             .ToArray();
         await Task.WhenAll(tasks);
 
@@ -60,7 +63,7 @@ public class MongoStorage : IGrainEventStorage
     {
         var container = GetCollection(grainTypeName);
 
-        return Task.FromResult((int)container.getCount());
+        return Task.FromResult((int)container.GetCount(grainReference));
     }
 
     private MongoEventStorageCollection GetCollection(string grainTypeName)

@@ -1,5 +1,6 @@
 ﻿using MongoDB.Bson;
 using MongoDB.Driver;
+using Orleans.Providers.MongoDB.Reminders.Store;
 using Orleans.Providers.MongoDB.StorageProviders.Serializers;
 using Orleans.Providers.MongoDB.Utils;
 
@@ -8,6 +9,7 @@ namespace JournaledTodoList.WebApp
     public class MongoEventStorageCollection : CollectionBase<BsonDocument>
     {
         private const string FieldId = "_id";
+        private const string FieldGrainId = "_grainId";
         private const string FieldDoc = "_doc";
         private const string FieldEtag = "_etag";
         private readonly string _collectionName;
@@ -29,15 +31,27 @@ namespace JournaledTodoList.WebApp
             return _collectionName;
         }
 
-        public long getCount()
+        protected override void SetupCollection(IMongoCollection<BsonDocument> collection) 
         {
-            return Collection.CountDocuments(Filter.Empty);
+            collection.Indexes.CreateOne(
+            new CreateIndexModel<BsonDocument>(Index.Ascending(new StringFieldDefinition<BsonDocument>(FieldGrainId) ),
+              new CreateIndexOptions
+              {
+                  Name = $"By{FieldGrainId}"
+              }));
         }
 
-        public async Task<(int Index, TEvent Event)> ReadAsync<TEvent>(int i)
+        public long GetCount(GrainId grainId)
         {
+            return Collection.CountDocuments(Filter.Eq(FieldGrainId, grainId.ToString()));
+        }
+
+        public async Task<(int Index, TEvent Event)> ReadAsync<TEvent>(GrainId grainId, int i)
+        {
+            var eventKey = $"{grainId.ToString()}/{i}";
+            
             var existing =
-                await Collection.Find(Filter.Eq(FieldId, i))
+                await Collection.Find(Filter.Eq(FieldId, eventKey))
                     .FirstOrDefaultAsync();
 
             if (existing == null)
@@ -63,8 +77,10 @@ namespace JournaledTodoList.WebApp
             return (i, result);
         }
 
-        public async Task WriteAsync<TEvent>(int i, TEvent @event)
+        public async Task WriteAsync<TEvent>(GrainId grainId, int i, TEvent @event)
         {
+            var eventKey = $"{grainId.ToString()}/{i}";
+
             var newData = _serializer.Serialize(@event);
 
             var newETag = Guid.NewGuid().ToString();
@@ -73,30 +89,16 @@ namespace JournaledTodoList.WebApp
             {
                 await Collection.UpdateOneAsync(
                     Filter.And(
-                        Filter.Eq(FieldId, i)),
+                        Filter.Eq(FieldId, eventKey)),
                     Update
+                        .Set(FieldGrainId, grainId.ToString())
                         .Set(FieldEtag, newETag)
                         .Set(FieldDoc, newData),
                     Upsert);
             }
-            catch (MongoException ex)
+            catch (MongoException)
             {
-                if (ex.IsDuplicateKey())
-                {
-
-                    var document = new BsonDocument
-                    {
-                        [FieldId] = i,
-                        [FieldEtag] = i,
-                        [FieldDoc] = newData
-                    };
-
-                    await Collection.ReplaceOneAsync(Filter.Eq(FieldId, i), document, UpsertReplace);
-                }
-                else
-                {
-                    throw;
-                }
+                throw;
             }
         }
 

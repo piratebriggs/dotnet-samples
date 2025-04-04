@@ -1,9 +1,8 @@
-﻿using JournaledTodoList.WebApp.Components;
+﻿using JournaledTodoList.WebApp;
+using JournaledTodoList.WebApp.Components;
 using JournaledTodoList.WebApp.Services;
-using Orleans.Providers;
 using Orleans.EventSourcing.Snapshot;
 using Orleans.EventSourcing.Snapshot.Hosting;
-using JournaledTodoList.WebApp;
 using Orleans.Providers.MongoDB.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,12 +31,12 @@ builder.UseOrleans(siloBuilder =>
 
         op.ConfigureIndependentEventStorage = (services, name) =>
         {
-            var options = new MongoDBGrainStorageOptions
+            var options = new MongoDBOptions
             {
-                DatabaseName = "OrleansTestAppPubSubStore",
+                DatabaseName = "OrleansTestAppPubSubStore", // Events can be in a separate db if required 
                 CreateShardKeyForCosmos = createShardKey,
             };
-            services.AddSingleton<MongoDBGrainStorageOptions>(options);
+            services.AddSingleton<MongoDBOptions>(options);
             services.AddSingleton<IGrainEventStorage, MongoStorage>();
         };
     });
