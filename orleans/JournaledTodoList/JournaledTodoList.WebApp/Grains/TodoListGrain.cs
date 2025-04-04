@@ -33,14 +33,14 @@ public sealed class TodoListGrain : JournaledGrain<TodoListGrain.TodoListProject
             : null;
     }
 
-    public async Task<TodoList> GetTodoListAsync()
+    public Task<TodoList> GetTodoListAsync()
     {
         var list = new TodoList(
             Name: this.GetPrimaryKeyString(),
             Items: State.Items.Values.OrderBy(x => x.Id).ToImmutableArray(),
             Timestamp: State.Timestamp);
 
-        return list;
+        return Task.FromResult(list);
     }
 
     public async Task AddTodoItemAsync(string title)
